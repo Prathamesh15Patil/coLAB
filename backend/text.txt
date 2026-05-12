@@ -1,0 +1,2 @@
+mongoDB password = "fUCkuChoor1*3"
+mongodb+srv://SuperNova:<db_password>@cluster0.9zhbbnr.mongodb.net/
