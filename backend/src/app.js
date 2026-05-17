@@ -14,6 +14,14 @@ app.use("/api/user", userRoutes);
 import classRoutes from "./routes/class.route.js";
 app.use("/api/class", classRoutes);
 
+//Assigenment
+import assignmentRoutes from "./routes/assignment.route.js";
+app.use("/api/assignment", assignmentRoutes);
+
+//Execute Code
+import executionRoutes from "./routes/execute.route.js";
+app.use("/api/execute", executionRoutes);
+
 //Import of error handling middleware
 import { errorHandler } from "./middlewares/error.middleware.js";
 app.use(errorHandler);
