@@ -1,12 +1,21 @@
 import Assignment from "../models/assignment.model.js";
+import Class from "../models/class.model.js";
 import User from "../models/user.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 
 const createAssignment = asyncHandler(async (req, res) => {
-  const { classId } = req.params;
-  const { title, description, dueDate, language } = req.body;
-  const classDoc = await Class.findOne({ classId });
+  const { classId, title, description, dueDate, language, sampleInput, expectedOutput } =
+    req.body;
+
+  if (!classId?.trim()) {
+    throw new ApiError(400, "Class ID is required");
+  }
+  if (!title?.trim() || !description?.trim() || !dueDate?.trim()) {
+    throw new ApiError(400, "Title, description, and due date are required");
+  }
+
+  const classDoc = await Class.findOne({ classId: classId.trim() });
   if (!classDoc) {
     throw new ApiError(404, "Class not found");
   }
@@ -14,18 +23,64 @@ const createAssignment = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Unauthorized");
   }
 
-  //all fields are required error check to be added
-
   const newAssignment = await Assignment.create({
     classId: classDoc._id,
     createdBy: req.user._id,
-    title,
-    description,
-    dueDate,
-    language,
+    title: title.trim(),
+    description: description.trim(),
+    dueDate: new Date(dueDate),
+    language: language || "java",
+    sampleInput: sampleInput?.trim() || undefined,
+    expectedOutput: expectedOutput?.trim() || undefined,
   });
   if (!newAssignment) {
     throw new ApiError(500, "Failed to create assignment");
+  }
+
+  // IMPLEMENTATION: generate random teams (pairs) from students enrolled in the class.
+  // If total number is odd, make one team of three. At most one team of three will be created.
+  try {
+    const studentIds = (classDoc.students || []).map((s) => s.toString());
+
+    const teams = [];
+    if (studentIds.length >= 2) {
+      // shuffle studentIds (Fisher-Yates)
+      for (let i = studentIds.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = studentIds[i];
+        studentIds[i] = studentIds[j];
+        studentIds[j] = tmp;
+      }
+
+      // If odd, take last three as one team, otherwise pair sequentially
+      let startIndex = 0;
+      if (studentIds.length % 2 === 1) {
+        if (studentIds.length === 3) {
+          teams.push({ members: studentIds.slice(0, 3) });
+          startIndex = 3;
+        } else {
+          // take last 3 as a team to preserve randomness
+          const lastThree = studentIds.splice(-3);
+          teams.push({ members: lastThree });
+        }
+      }
+
+      // pair remaining students
+      for (let i = 0; i < studentIds.length; i += 2) {
+        if (studentIds[i + 1]) {
+          teams.push({ members: [studentIds[i], studentIds[i + 1]] });
+        }
+      }
+    }
+
+    if (teams.length > 0) {
+      await Assignment.findByIdAndUpdate(newAssignment._id, {
+        $set: { teams },
+      });
+    }
+  } catch (err) {
+    // pairing failure should not block assignment creation; log and continue
+    console.error("Failed to generate teams for assignment", err);
   }
 
   await Class.findByIdAndUpdate(classDoc._id, {
@@ -54,7 +109,7 @@ const getAssignmentsByClass = asyncHandler(async (req, res) => {
   // - Faculty can view only if they own the class
   // - Students can view only if enrolled in the class
   if (req.user.role === "faculty") {
-    if (classDoc.facultyid.toString() !== req.user._id.toString()) {
+    if (classDoc.facultyId.toString() !== req.user._id.toString()) {
       throw new ApiError(403, "Unauthorized");
     }
   } else {
@@ -70,7 +125,9 @@ const getAssignmentsByClass = asyncHandler(async (req, res) => {
   // Fetch all assignments belonging to this class
   const assignments = await Assignment.find({
     classId: classDoc._id,
-  }).sort({ createdAt: -1 });
+  })
+    .sort({ createdAt: -1 })
+    .populate("teams.members", "name email role");
 
   res.status(200).json({
     message: "Assignments fetched successfully",
@@ -82,7 +139,10 @@ const getAssignmentById = asyncHandler(async (req, res) => {
   const { assId } = req.params;
 
   // Find assignment
-  const assignment = await Assignment.findById(assId);
+  const assignment = await Assignment.findById(assId).populate(
+    "teams.members",
+    "name email role",
+  );
 
   if (!assignment) {
     throw new ApiError(404, "Assignment not found");
@@ -99,7 +159,7 @@ const getAssignmentById = asyncHandler(async (req, res) => {
   // - Faculty can view only if they own the class
   // - Students can view only if enrolled in the class
   if (req.user.role === "faculty") {
-    if (classDoc.facultyid.toString() !== req.user._id.toString()) {
+    if (classDoc.facultyId.toString() !== req.user._id.toString()) {
       throw new ApiError(403, "Unauthorized");
     }
   } else {
@@ -124,7 +184,7 @@ const updateAssignment = asyncHandler(async (req, res) => {
   if (!assignment) {
     throw new ApiError(404, "Assignment not found");
   }
-  const { title, description, dueDate, language } = req.body;
+  const { title, description, dueDate, language, sampleInput } = req.body;
   if (assignment.createdBy.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Only faculty can update assignment");
   }
@@ -136,6 +196,7 @@ const updateAssignment = asyncHandler(async (req, res) => {
       description,
       dueDate,
       language,
+      sampleInput: sampleInput?.trim() || undefined,
     },
     {
       new: true,

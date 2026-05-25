@@ -8,17 +8,34 @@ const create = asyncHandler(async (req, res) => {
   if (req.user.role !== "faculty") {
     throw new ApiError(403, "Unauthorized");
   }
+
+  if (
+    ![name, courseCode, division].every(
+      (field) => typeof field === "string" && field.trim(),
+    )
+  ) {
+    throw new ApiError(400, "Name, courseCode, and division are required");
+  }
+
+  const normalizedCourseCode = courseCode.trim().toUpperCase();
+  const normalizedDivision = division.trim().toUpperCase();
   const currentYear = new Date().getFullYear().toString().slice(-2);
-  const classCode = courseCode + "-" + currentYear + division;
+  const classCode = `${normalizedCourseCode}-${currentYear}${normalizedDivision}`;
 
   const existingClass = await Class.findOne({ classId: classCode });
   if (existingClass) {
-    throw new ApiError(400, "Class with this course code already exists");
+    throw new ApiError(
+      400,
+      "Class with this course code and division already exists",
+    );
   }
+
   const newClass = await Class.create({
-    facultyid: req.user._id,
-    name,
+    facultyId: req.user._id,
+    name: name.trim(),
     classId: classCode,
+    students: [],
+    assignments: [],
   });
 
   if (!newClass) {
@@ -32,6 +49,7 @@ const create = asyncHandler(async (req, res) => {
         classesTeaching: newClass._id,
       },
     },
+    { new: true },
   );
 
   if (!updateClassesTeaching) {
@@ -39,7 +57,8 @@ const create = asyncHandler(async (req, res) => {
   }
 
   res.status(201).json({
-    message: "Class created and added successfully",
+    message: "Class created successfully",
+    class: newClass,
   });
 });
 
@@ -111,17 +130,14 @@ const getMyClasses = asyncHandler(async (req, res) => {
 
   if (userRole === "faculty") {
     const user = await User.findById(req.user._id).populate("classesTeaching");
-    const ClassesTeaching = user.classesTeaching;
-    if (!ClassesTeaching) {
-      throw new ApiError(404, "No classes found ");
-    }
+    const ClassesTeaching = user?.classesTeaching || [];
     res.status(200).json({ ClassesTeaching });
   } else if (userRole === "student") {
-    const user = await User.findById(req.user._id).populate("classesEnrolled");
-    const ClassesEnrolled = user.classesEnrolled;
-    if (!ClassesEnrolled) {
-      throw new ApiError(404, "No classes found ");
-    }
+    const user = await User.findById(req.user._id).populate({
+      path: "classesEnrolled",
+      populate: { path: "facultyId", select: "name email" },
+    });
+    const ClassesEnrolled = user?.classesEnrolled || [];
     res.status(200).json({ ClassesEnrolled });
   } else {
     throw new ApiError(403, "Unauthorized");
@@ -146,18 +162,31 @@ const UpdateClass = asyncHandler(async (req, res) => {
   const { classId } = req.params;
   const { name } = req.body;
 
+  if (req.user.role !== "faculty") {
+    throw new ApiError(403, "Unauthorized");
+  }
+
+  if (!name?.trim()) {
+    throw new ApiError(400, "Name is required to update class");
+  }
+
+  const classDoc = await Class.findOne({ classId });
+  if (!classDoc) {
+    throw new ApiError(404, "Class not found");
+  }
+
+  if (classDoc.facultyId.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "Only the faculty owner can update this class");
+  }
+
   const updatedClass = await Class.findOneAndUpdate(
     { classId },
-    { name },
+    { name: name.trim() },
     {
       new: true,
       runValidators: true,
     },
   );
-
-  if (!updatedClass) {
-    throw new ApiError(404, "Class not found");
-  }
 
   res.status(200).json({
     success: true,
@@ -172,17 +201,24 @@ const DeleteClass = asyncHandler(async (req, res) => {
   if (!classDoc) {
     throw new ApiError(404, "Class not found");
   }
-  if (classDoc.facultyId.toString() !== req.user._id.toString()) {
+
+  if (
+    req.user.role !== "faculty" ||
+    classDoc.facultyId.toString() !== req.user._id.toString()
+  ) {
     throw new ApiError(403, "Unauthorized action");
   }
 
-  const deleteClassFromList = await User.findByIdAndUpdate(classDoc.facultyid, {
+  const deleteClassFromList = await User.findByIdAndUpdate(classDoc.facultyId, {
     $pull: {
       classesTeaching: classDoc._id,
     },
   });
   if (!deleteClassFromList) {
-    throw new ApiError(500, "Failed to delete class from list");
+    throw new ApiError(
+      500,
+      "Failed to delete class from faculty teaching list",
+    );
   }
 
   await User.updateMany(

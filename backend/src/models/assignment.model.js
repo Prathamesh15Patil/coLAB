@@ -28,11 +28,30 @@ const assignmentSchema = mongoose.Schema(
       required: true,
     },
     language: {
-      enum: ["python", "java", "C", "C++"],
+      enum: ["python", "java", "C", "C++", "Any"],
       type: String,
       // required:true,
       default: "java",
     },
+    sampleInput: {
+      type: String,
+      trim: true,
+    },
+    expectedOutput: {
+      type: String,
+      trim: true,
+    },
+    // Teams generated when assignment is created. Each team contains member user ids.
+    teams: [
+      {
+        members: [
+          {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+          },
+        ],
+      },
+    ],
   },
   {
     timestamps: true,

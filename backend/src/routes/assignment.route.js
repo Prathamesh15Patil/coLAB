@@ -13,7 +13,7 @@ const router = Router();
 router.route("/create").post(verifyJWT, createAssignment);
 router.route("/update/:assId").put(verifyJWT, updateAssignment);
 router.route("/delete/:assId").delete(verifyJWT, deleteAssignment);
-router.route("/:assId").get(verifyJWT, getAssignmentById);
-router.route("/:classId").get(verifyJWT, getAssignmentsByClass);
+router.route("/details/:assId").get(verifyJWT, getAssignmentById);
+router.route("/class/:classId").get(verifyJWT, getAssignmentsByClass);
 
 export default router;

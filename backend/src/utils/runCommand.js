@@ -7,40 +7,64 @@ import { spawn } from "child_process";
 // args → array of arguments
 // input → text to send to stdin
 // timeoutMs → maximum allowed execution time
+
 const runCommand = async (command, args, input = "", timeoutMs = 5000) => {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args); //this is equivalaent to typing command in the terminal.
+    const child = spawn(command, args);
+
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let outputExceeded = false;
 
+    const MAX_OUTPUT_SIZE = 1024 * 1024; // 1 MB
+
+    // Capture stdout
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
+
+      // Check output limit here
+      if (stdout.length > MAX_OUTPUT_SIZE) {
+        outputExceeded = true;
+        child.kill("SIGKILL");
+      }
     });
 
+    // Capture stderr
     child.stderr.on("data", (chunk) => {
       stderr += chunk.toString();
+
+      // Optional: also limit stderr
+      if (stderr.length > MAX_OUTPUT_SIZE) {
+        outputExceeded = true;
+        child.kill("SIGKILL");
+      }
     });
 
+    // Send stdin
     child.stdin.write(input);
     child.stdin.end();
 
+    // Timeout handler
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGKILL");
     }, timeoutMs);
 
+    // Resolve only when process fully closes
     child.on("close", (exitCode) => {
       clearTimeout(timer);
 
       resolve({
         stdout,
         stderr,
-        exitCode,
+        exitCode: timedOut ? null : exitCode,
         timedOut,
+        outputExceeded,
       });
     });
 
+    // Process spawn error
     child.on("error", (error) => {
       clearTimeout(timer);
       reject(error);
