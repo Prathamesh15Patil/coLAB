@@ -37,6 +37,10 @@ const assignmentSchema = mongoose.Schema(
       type: String,
       trim: true,
     },
+    sampleOutput: {
+      type: String,
+      trim: true,
+    },
     expectedOutput: {
       type: String,
       trim: true,
@@ -50,6 +54,12 @@ const assignmentSchema = mongoose.Schema(
             ref: "User",
           },
         ],
+      },
+    ],
+    submittedStudents: [
+      {
+        type: String,
+        trim: true,
       },
     ],
   },

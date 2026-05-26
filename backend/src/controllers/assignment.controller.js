@@ -5,8 +5,16 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 
 const createAssignment = asyncHandler(async (req, res) => {
-  const { classId, title, description, dueDate, language, sampleInput, expectedOutput } =
-    req.body;
+  const {
+    classId,
+    title,
+    description,
+    dueDate,
+    language,
+    sampleInput,
+    sampleOutput,
+    expectedOutput,
+  } = req.body;
 
   if (!classId?.trim()) {
     throw new ApiError(400, "Class ID is required");
@@ -31,6 +39,7 @@ const createAssignment = asyncHandler(async (req, res) => {
     dueDate: new Date(dueDate),
     language: language || "java",
     sampleInput: sampleInput?.trim() || undefined,
+    sampleOutput: sampleOutput?.trim() || undefined,
     expectedOutput: expectedOutput?.trim() || undefined,
   });
   if (!newAssignment) {
@@ -184,7 +193,8 @@ const updateAssignment = asyncHandler(async (req, res) => {
   if (!assignment) {
     throw new ApiError(404, "Assignment not found");
   }
-  const { title, description, dueDate, language, sampleInput } = req.body;
+  const { title, description, dueDate, language, sampleInput, sampleOutput } =
+    req.body;
   if (assignment.createdBy.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Only faculty can update assignment");
   }
@@ -197,6 +207,7 @@ const updateAssignment = asyncHandler(async (req, res) => {
       dueDate,
       language,
       sampleInput: sampleInput?.trim() || undefined,
+      sampleOutput: sampleOutput?.trim() || undefined,
     },
     {
       new: true,

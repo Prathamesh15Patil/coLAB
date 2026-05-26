@@ -9,7 +9,7 @@ const Assignments = ({ user, setUser }) => {
     const [assignments, setAssignments] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
-    const [form, setForm] = useState({ title: '', description: '', dueDate: '', language: 'Any', sampleInput: '' })
+    const [form, setForm] = useState({ title: '', description: '', dueDate: '', language: 'Any', sampleInput: '', sampleOutput: '' })
     const [editingAssignment, setEditingAssignment] = useState(null)
 
     const fetchAssignments = async () => {
@@ -63,7 +63,7 @@ const Assignments = ({ user, setUser }) => {
 
         try {
             await createAssignment({ ...form, classId })
-            setForm({ title: '', description: '', dueDate: '', language: 'Any', sampleInput: '' })
+            setForm({ title: '', description: '', dueDate: '', language: 'Any', sampleInput: '', sampleOutput: '' })
             fetchAssignments()
         } catch (err) {
             setError(err.message)
@@ -78,6 +78,7 @@ const Assignments = ({ user, setUser }) => {
             dueDate: new Date(assignment.dueDate).toISOString().slice(0, 10),
             language: assignment.language || 'java',
             sampleInput: assignment.sampleInput || '',
+            sampleOutput: assignment.sampleOutput || '',
         })
         setError('')
     }
@@ -96,9 +97,10 @@ const Assignments = ({ user, setUser }) => {
                 dueDate: form.dueDate,
                 language: form.language,
                 sampleInput: form.sampleInput,
+                sampleOutput: form.sampleOutput,
             })
             setEditingAssignment(null)
-            setForm({ title: '', description: '', dueDate: '', language: 'Any', sampleInput: '' })
+            setForm({ title: '', description: '', dueDate: '', language: 'Any', sampleInput: '', sampleOutput: '' })
             fetchAssignments()
         } catch (err) {
             setError(err.message)
@@ -200,6 +202,17 @@ const Assignments = ({ user, setUser }) => {
                                     placeholder="Optional sample input for the assignment"
                                 />
                             </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700">Sample output (optional)</label>
+                                <textarea
+                                    name="sampleOutput"
+                                    value={form.sampleOutput}
+                                    onChange={handleFormChange}
+                                    className="mt-2 w-full rounded border border-slate-300 px-4 py-2 focus:border-slate-900 focus:outline-none"
+                                    rows="4"
+                                    placeholder="Optional sample output for students"
+                                />
+                            </div>
                             <button type="submit" className="rounded bg-slate-900 px-4 py-3 text-white">
                                 Create assignment
                             </button>
@@ -228,6 +241,18 @@ const Assignments = ({ user, setUser }) => {
                                                 <pre className="whitespace-pre-wrap">{assignment.sampleInput}</pre>
                                             </div>
                                         )}
+                                        {assignment.sampleOutput && (
+                                            <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                                                <p className="font-semibold">Sample output</p>
+                                                <pre className="whitespace-pre-wrap">{assignment.sampleOutput}</pre>
+                                            </div>
+                                        )}
+                                        {assignment.sampleOutput && (
+                                            <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                                                <p className="font-semibold">Sample output</p>
+                                                <pre className="whitespace-pre-wrap">{assignment.sampleOutput}</pre>
+                                            </div>
+                                        )}
                                         <p className="mt-3 text-sm text-slate-500">Language: {assignment.language || 'java'}</p>
                                         {user?.role === 'student' && (() => {
                                             const partners = getAssignmentPartners(assignment)
@@ -244,15 +269,20 @@ const Assignments = ({ user, setUser }) => {
                                         })()}
                                     </div>
                                     <div className="flex flex-wrap gap-2 items-end">
-                                        {user?.role === 'student' && (
-                                            <button
-                                                type="button"
-                                                onClick={() => navigate('/id-generator', { state: { assignment } })}
-                                                className="rounded bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700"
-                                            >
-                                                Start WorkSpace
-                                            </button>
-                                        )}
+                                        {user?.role === 'student' && (() => {
+                                            const currentUserName = user?.name || user?.username || '';
+                                            const isSubmitted = assignment.submittedStudents?.includes(currentUserName);
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => navigate('/id-generator', { state: { assignment } })}
+                                                    disabled={isSubmitted}
+                                                    className={`rounded px-4 py-2 text-sm font-semibold ${isSubmitted ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+                                                >
+                                                    {isSubmitted ? 'Submitted' : 'Start WorkSpace'}
+                                                </button>
+                                            )
+                                        })()}
                                         {user?.role === 'faculty' && (
                                             <div className="flex flex-wrap gap-2">
                                                 <button

@@ -46,8 +46,8 @@ const submitAssignment = asyncHandler(async (req, res) => {
   // Check if user is part of a team in this assignment
   const userTeam = assignment.teams.find((team) =>
     team.members.some(
-      (memberId) => memberId.toString() === req.user._id.toString()
-    )
+      (memberId) => memberId.toString() === req.user._id.toString(),
+    ),
   );
 
   if (!userTeam) {
@@ -62,11 +62,14 @@ const submitAssignment = asyncHandler(async (req, res) => {
     outputMatches = normalizedExpected === normalizedActual;
   }
 
+  const studentsToStore =
+    studentsInRoom.length > 0 ? studentsInRoom : ["Student"];
+
   // Create submission
   const submission = await Submission.create({
     assignmentId: assignment._id,
     submittedBy: userTeam.members,
-    studentsInRoom: studentsInRoom.length > 0 ? studentsInRoom : ["Student"],
+    studentsInRoom: studentsToStore,
     code: code.trim(),
     output: output?.trim() || "",
     expectedOutput: assignment.expectedOutput || "",
@@ -77,6 +80,15 @@ const submitAssignment = asyncHandler(async (req, res) => {
   if (!submission) {
     throw new ApiError(500, "Failed to create submission");
   }
+
+  // Add submitted students to assignment status without duplicates
+  await Assignment.findByIdAndUpdate(assignment._id, {
+    $addToSet: {
+      submittedStudents: {
+        $each: studentsToStore,
+      },
+    },
+  });
 
   res.status(201).json({
     message: "Assignment submitted successfully",
@@ -108,11 +120,12 @@ const getSubmissionPDF = asyncHandler(async (req, res) => {
 
   // Authorization: only team members or faculty can access
   const isTeamMember = submission.submittedBy.some(
-    (member) => member._id.toString() === req.user._id.toString()
+    (member) => member._id.toString() === req.user._id.toString(),
   );
 
-  const assignment = await Assignment.findById(submission.assignmentId)
-    .populate("classId");
+  const assignment = await Assignment.findById(
+    submission.assignmentId,
+  ).populate("classId");
   const isFaculty =
     assignment.createdBy.toString() === req.user._id.toString() ||
     assignment.classId.facultyId.toString() === req.user._id.toString();
@@ -123,9 +136,10 @@ const getSubmissionPDF = asyncHandler(async (req, res) => {
 
   try {
     // Get room members info for the PDF (use studentsInRoom if available)
-    const studentsInRoom = submission.studentsInRoom && submission.studentsInRoom.length > 0 
-      ? submission.studentsInRoom 
-      : submission.submittedBy.map((user) => user.name);
+    const studentsInRoom =
+      submission.studentsInRoom && submission.studentsInRoom.length > 0
+        ? submission.studentsInRoom
+        : submission.submittedBy.map((user) => user.name);
 
     // Prepare PDF data
     const pdfData = {
