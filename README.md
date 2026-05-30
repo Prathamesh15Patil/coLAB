@@ -1,5 +1,5 @@
 # Code-CoLAB
-> A high-concurrency real-time collaborative environment designed to transform passive computer lab sessions into active, peer-driven learning experiences.
+> A real-time collaborative environment designed to transform passive computer lab sessions into active, peer-driven learning experiences.
 
 ## Problem Statement
 Traditional computer science labs suffer from a systemic pedagogical flaw: **passive learning**. Students often just copy-paste the program instead of learning the working(to complete their hand written lab journal the biggest 🚩), leading to:
@@ -25,13 +25,13 @@ Code-CoLAB solves the pedagogical issue of passive learning by enforcing a **syn
 By integrating bidirectional state synchronization, isolated Docker-based execution, and peer-to-peer WebRTC voice communication, Code-CoLAB bridges the gap between isolated coding and true collaborative engineering.
 
 ## Core Features
-- **Real-Time Collaborative Editor:** Sub-millisecond code synchronization across multiple clients.
+- **Real-Time Collaborative Editor:** Low-latency real-time code synchronization across multiple clients using Socket.IO.
 - **Docker-Based Execution Engine:** Unified, reproducible runtime environments eliminating the "works on my machine" problem.
 - **Multi-Language Execution:** Native support for Python, Java, C etc inside secure containers.
 - **WebRTC Voice Communication:** High-fidelity, low-latency peer-to-peer audio for immediate architectural discussions.
 - **Assignment Workflow:** Structured environments for educators to distribute, monitor, and review team-based coding tasks.
 - **Anti Copy-Paste Protections:**To ensure active typing and genuine code construction during assignments(ok they can see and write, that's fine atleast student will know what they are doing instead of quick c-p)
-- **Sandbox Protection:** Hardened execution isolation preventing malicious code and infinite loops from crashing the host server.
+- **Sandbox Protection:** Containerized execution environments with resource and timeout constraints to reduce the impact of malicious or runaway code.
 
 ## System Architecture
 
@@ -120,8 +120,16 @@ MONGODB_URI=your_mongodb_connection_string
    npm start
    ```
 
-## Future Enhancements
-- Video streaming integration via WebRTC.
+## Current Limitations
+
+As an MVP focused on educational collaboration, the current architecture has several known limitations:
+
+- Collaborative editing currently relies on Socket.IO event synchronization rather than CRDT/OT-based conflict resolution.
+- Code execution is handled through Docker containers on a single host and is not horizontally scaled.
+- Task execution currently does not use a distributed job queue.
+- The platform is optimized for classroom-sized sessions rather than large-scale public deployment.
+
+Future iterations may incorporate Redis, BullMQ, CRDT-based synchronization, and distributed execution workers.
 - Advanced static code analysis and automated grading for assignments.
 - Expanded language support (C++, Go, Rust) via optimized Docker images.
 
