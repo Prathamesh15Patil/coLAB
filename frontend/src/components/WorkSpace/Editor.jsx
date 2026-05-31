@@ -49,8 +49,8 @@ const Editor = ({ socketRef, roomId, onCodeChange, language }) => { // New: rece
                         "Cmd-C": false,
                         "Ctrl-X": false,
                         "Cmd-X": false,
-                        // "Ctrl-V": false,
-                        // "Cmd-V": false,
+                        "Ctrl-V": false,
+                        "Cmd-V": false,
                     }
                 }
             );
