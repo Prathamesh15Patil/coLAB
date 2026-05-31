@@ -26,51 +26,42 @@ export const generateSubmissionPDF = (data) => {
 
       doc.pipe(stream);
 
-      // Title
-      doc.fontSize(20).font("Helvetica-Bold").text("Assignment Submission Report", {
-        align: "center",
-      });
+      // Report title
+      doc
+        .fontSize(20)
+        .font("Helvetica-Bold")
+        .text("ASSIGNMENT SUBMISSION REPORT", {
+          align: "center",
+        });
 
       doc.moveDown(0.5);
-      doc.fontSize(10).font("Helvetica").text("=" .repeat(100), {
+      doc.fontSize(10).font("Helvetica").text("=".repeat(90), {
         align: "center",
       });
 
       doc.moveDown(0.8);
-
-      // Header Information
       doc.fontSize(11).font("Helvetica-Bold").text("SUBMISSION DETAILS", {
         underline: true,
       });
 
       doc.moveDown(0.3);
       doc.fontSize(10).font("Helvetica");
-
-      const headerInfo = [
-        { label: "Class Code:", value: data.classCode || "N/A" },
-        { label: "Assignment Title:", value: data.assignmentTitle || "N/A" },
-        { label: "Submitted By:", value: data.submittedBy || "N/A" },
-        { label: "Submission Date:", value: new Date().toLocaleString() },
-      ];
-
-      headerInfo.forEach((item) => {
-        doc.text(`${item.label} ${item.value}`);
-      });
-
-      // Students in Room
-      if (data.studentsInRoom && data.studentsInRoom.length > 0) {
-        doc.moveDown(0.5);
-        doc.fontSize(11).font("Helvetica-Bold").text("TEAM MEMBERS", {
-          underline: true,
-        });
-        doc.moveDown(0.3);
-        doc.fontSize(10).font("Helvetica");
-        data.studentsInRoom.forEach((student, index) => {
-          doc.text(`${index + 1}. ${student}`);
-        });
+      doc.text(`Class Code: ${data.classCode || "N/A"}`);
+      doc.text(`Assignment Title: ${data.assignmentTitle || "N/A"}`);
+      doc.text(`Description: ${data.assignmentDescription || "N/A"}`);
+      if (data.sampleInput) {
+        doc.text(`Sample Input: ${data.sampleInput}`);
       }
+      if (data.sampleOutput) {
+        doc.text(`Sample Output: ${data.sampleOutput}`);
+      }
+      doc.text(`Maximum Marks: ${data.maximumMarks ?? "N/A"}`);
+      doc.text(`Submitted By: ${data.submittedBy || "N/A"}`);
+      doc.text(
+        `Submission Date: ${new Date(data.submissionDate || Date.now()).toLocaleString()}`,
+      );
 
-      // Code Section
+      // Source code
       doc.moveDown(0.8);
       doc.fontSize(11).font("Helvetica-Bold").text("SOURCE CODE", {
         underline: true,
@@ -78,76 +69,63 @@ export const generateSubmissionPDF = (data) => {
 
       doc.moveDown(0.3);
       doc.fontSize(9).font("Courier");
-
-      const codeLines = data.code.split("\n");
-      const maxLinesPerPage = 30;
-
-      codeLines.forEach((line, index) => {
-        if (index > 0 && index % maxLinesPerPage === 0) {
-          doc.addPage();
-        }
-        const lineNumber = (index + 1).toString().padStart(3, " ");
-        doc.text(`${lineNumber} | ${line}`, { width: 500 });
+      data.code.split("\n").forEach((line) => {
+        doc.text(line, {
+          width: 500,
+          lineBreak: true,
+        });
       });
 
-      // Output Comparison Section
+      // AI Evaluation
       doc.addPage();
-      doc.fontSize(11).font("Helvetica-Bold").text("EXECUTION RESULTS", {
+      doc.fontSize(11).font("Helvetica-Bold").text("AI EVALUATION", {
         underline: true,
       });
 
-      doc.moveDown(0.5);
-
-      // Expected Output
-      doc.fontSize(10).font("Helvetica-Bold").text("Expected Output:");
-      doc.fontSize(9).font("Courier");
-      doc.text(data.expectedOutput || "No expected output provided", {
-        width: 500,
-        bg: "f0f0f0",
-      });
-
-      doc.moveDown(0.5);
-
-      // Actual Output
-      doc.fontSize(10).font("Helvetica-Bold").text("Actual Output:");
-      doc.fontSize(9).font("Courier");
-
-      const outputColor = data.outputMatches ? "#28a745" : "#dc3545";
+      doc.moveDown(0.3);
+      doc.fontSize(10).font("Helvetica");
+      doc.text(`Category: ${data.aiEvaluation?.category || "N/A"}`);
+      doc.text(
+        `Score: ${typeof data.aiEvaluation?.score === "number" ? `${data.aiEvaluation.score} / 10` : "N/A"}`,
+      );
+      doc.moveDown(0.2);
+      doc.font("Helvetica-Bold").text("Feedback:");
       doc
-        .fillColor(outputColor)
-        .text(data.output || "No output generated", {
+        .font("Helvetica")
+        .text(data.aiEvaluation?.feedback || "No feedback provided", {
           width: 500,
         });
 
-      doc.fillColor("black");
+      if (data.aiEvaluation?.weaknesses?.length) {
+        doc.moveDown(0.2);
+        doc.font("Helvetica-Bold").text("Weaknesses:");
+        doc.font("Helvetica");
+        data.aiEvaluation.weaknesses.forEach((weakness) => {
+          doc.text(`• ${weakness}`);
+        });
+      }
 
-      doc.moveDown(0.5);
-
-      // Validation Status
-      const statusBg = data.outputMatches ? "#d4edda" : "#f8d7da";
-      const statusText = data.outputMatches
-        ? "✓ OUTPUT MATCHES EXPECTED"
-        : "✗ OUTPUT DOES NOT MATCH EXPECTED";
+      // Assessment Results
+      doc.moveDown(0.8);
+      doc.fontSize(11).font("Helvetica-Bold").text("ASSESSMENT RESULTS", {
+        underline: true,
+      });
 
       doc.moveDown(0.3);
-      doc
-        .fontSize(10)
-        .font("Helvetica-Bold")
-        .text(statusText, {
-          align: "center",
-          bg: statusBg,
-          padding: 10,
-        });
+      doc.fontSize(10).font("Helvetica");
+      const assessmentCompleted = data.assessment?.completed === true;
+      const mcqCount = data.aiEvaluation?.mcqs?.length || 0;
+      doc.text(`Assessment Completed: ${assessmentCompleted ? "Yes" : "No"}`);
+      doc.text(
+        `MCQ Score: ${assessmentCompleted ? `${data.assessment.score} / ${mcqCount}` : "N/A"}`,
+      );
 
       // Footer
-      doc.moveDown(1);
-      doc
-        .fontSize(8)
-        .font("Helvetica")
-        .text("Generated by coLAB - Collaborative Code Learning Platform", {
-          align: "center",
-          color: "#999999",
-        });
+      doc.moveDown(1.2);
+      doc.fontSize(8).font("Helvetica").text("Generated by Code-CoLAB", {
+        align: "center",
+        opacity: 0.7,
+      });
 
       doc.end();
 

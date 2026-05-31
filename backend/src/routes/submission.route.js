@@ -3,6 +3,7 @@ import {
   submitAssignment,
   getSubmissionPDF,
   getSubmissionsByAssignment,
+  submitSubmissionAssessment,
 } from "../controllers/submission.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
@@ -16,6 +17,9 @@ router.post("/submit", submitAssignment);
 
 // Get submission as PDF
 router.get("/:submissionId/pdf", getSubmissionPDF);
+
+// Submit assessment for MCQs
+router.post("/:submissionId/assessment", submitSubmissionAssessment);
 
 // Get all submissions for an assignment (faculty only)
 router.get("/assignment/:assignmentId", getSubmissionsByAssignment);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import '../App.css'
 import Members from '../components/WorkSpace/Members'
 import { toast } from 'react-hot-toast'
@@ -7,7 +7,7 @@ import Editor from '../components/WorkSpace/Editor.jsx'
 import { initSocket } from '../components/WorkSpace/socket.js'
 import ACTIONS from "../utils/Actions.js"
 import { runCode } from '../apis/executeApi.js'
-import { submitAssignment, downloadSubmissionPDF } from '../apis/submissionApi.js'
+import Submission from './Submission.jsx'
 
 
 const WorkSpace = () => {
@@ -362,6 +362,13 @@ const WorkSpace = () => {
                 setRemoteRunner(null);
             });
 
+            socketRef.current.on(ACTIONS.ASSIGNMENT_COMPLETED, ({ roomId: completedRoomId, assignmentId }) => {
+                if (completedRoomId === roomId) {
+                    toast.success('Assignment completed by a team member. Returning to assignments.');
+                    handleSubmissionComplete();
+                }
+            });
+
             //listening for disconnected
             socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId, username }) => {
                 toast.success(`${username} left the room.`)
@@ -397,6 +404,7 @@ const WorkSpace = () => {
                 socketRef.current.off("language-change");
                 socketRef.current.off("code-running");
                 socketRef.current.off("code-idle");
+                socketRef.current.off(ACTIONS.ASSIGNMENT_COMPLETED);
                 socketRef.current.off("webrtc-offer");
                 socketRef.current.off("webrtc-answer");
                 socketRef.current.off("ice-candidate");
@@ -423,9 +431,27 @@ const WorkSpace = () => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [executionResult, setExecutionResult] = useState(null);
     const [remoteRunner, setRemoteRunner] = useState(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submissionResult, setSubmissionResult] = useState(null);
-    const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+
+    const handleSubmissionComplete = useCallback(() => {
+        const classId = typeof assignment?.classId === 'object'
+            ? assignment.classId._id || assignment.classId
+            : assignment?.classId;
+        const targetRoute = classId ? `/class/${classId}/assignments` : '/enrolled';
+
+        if (socketRef.current) {
+            socketRef.current.emit(ACTIONS.LEAVE, { roomId });
+        }
+
+        cleanupWebRTC();
+        setMembers([]);
+        setRemoteRunner(null);
+        setIsRunning(false);
+        setExecutionResult(null);
+        setIsDrawerOpen(false);
+        codeRef.current = "";
+
+        navigate(targetRoute, { replace: true });
+    }, [assignment, navigate, roomId]);
 
     const handleRunCode = async () => {
         if (!codeRef.current) {
@@ -468,62 +494,6 @@ const WorkSpace = () => {
             }
         }
     };
-
-    const handleSubmitAssignment = async () => {
-        if (!codeRef.current) {
-            toast.error("Please type some code first!");
-            return;
-        }
-
-        if (!assignment?._id) {
-            toast.error("Assignment information not loaded!");
-            return;
-        }
-
-        setIsSubmitting(true);
-
-        try {
-            // Get the names of all students currently in the room
-            const studentsInRoom = members.map((member) => member.username);
-
-            const result = await submitAssignment(
-                assignment._id,
-                codeRef.current,
-                executionResult?.output || "",
-                studentsInRoom
-            );
-
-            setSubmissionResult({
-                _id: result.submission._id,
-                outputMatches: result.submission.outputMatches,
-                isValidated: result.submission.isValidated,
-                output: executionResult?.output || "",
-                expectedOutput: assignment.expectedOutput || "",
-            });
-
-            setShowSubmissionModal(true);
-            toast.success("Assignment submitted successfully!");
-        } catch (err) {
-            toast.error(err.message || "Failed to submit assignment");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleDownloadPDF = async () => {
-        if (!submissionResult?._id) {
-            toast.error("No submission available for download!");
-            return;
-        }
-
-        try {
-            await downloadSubmissionPDF(submissionResult._id);
-            toast.success("PDF downloaded successfully!");
-        } catch (err) {
-            toast.error(err.message || "Failed to download PDF");
-        }
-    };
-
 
     return (
         <div className='flex h-screen w-full overflow-hidden bg-zinc-955 text-zinc-100 font-sans relative'>
@@ -727,31 +697,17 @@ const WorkSpace = () => {
                             )}
                         </button>
 
-                        <button
-                            onClick={handleSubmitAssignment}
-                            disabled={isSubmitting || !executionResult}
-                            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-bold text-xs shadow-md transition-all duration-200 cursor-pointer ${isSubmitting || !executionResult
-                                ? "bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed"
-                                : "bg-indigo-600 hover:bg-indigo-700 text-white hover:scale-105 active:scale-95"
-                                }`}
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Submitting...
-                                </>
-                            ) : (
-                                <>
-                                    <svg className="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                                    </svg>
-                                    Submit
-                                </>
-                            )}
-                        </button>
+                        <Submission
+                            assignmentId={assignment?._id}
+                            codeRef={codeRef}
+                            executionOutput={executionResult?.output || ""}
+                            expectedOutput={assignment?.expectedOutput || ""}
+                            studentsInRoom={members.map((member) => member.username)}
+                            canSubmit={!!executionResult}
+                            roomId={roomId}
+                            socketRef={socketRef}
+                            onSubmissionComplete={handleSubmissionComplete}
+                        />
                     </div>
                 </div>
 
@@ -769,7 +725,7 @@ const WorkSpace = () => {
 
                 {/* Sliding Execution Drawer (comes from right) */}
                 <div
-                    className={`absolute top-0 right-0 h-full bg-zinc-900/95 backdrop-blur-md border-l border-zinc-800 shadow-2xl transition-all duration-300 ease-out z-50 flex flex-col ${isDrawerOpen ? "w-[450px] opacity-100 translate-x-0" : "w-0 opacity-0 translate-x-full pointer-events-none"
+                    className={`absolute top-0 right-0 h-full bg-zinc-900/95 backdrop-blur-md border-l border-zinc-800 shadow-2xl transition-all duration-300 ease-out z-50 flex flex-col ${isDrawerOpen ? "w-112.5 opacity-100 translate-x-0" : "w-0 opacity-0 translate-x-full pointer-events-none"
                         }`}
                 >
                     {/* Drawer Header */}
@@ -860,103 +816,6 @@ const WorkSpace = () => {
                     </div>
                 </div>
 
-                {/* Submission Modal */}
-                {showSubmissionModal && submissionResult && (
-                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-100 flex items-center justify-center p-4">
-                        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                            {/* Modal Header */}
-                            <div className="h-14 border-b border-zinc-800 px-6 flex items-center justify-between shrink-0 bg-zinc-900 sticky top-0 z-10">
-                                <span className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                                    <span className={`h-3 w-3 rounded-full ${submissionResult.isValidated
-                                        ? submissionResult.outputMatches
-                                            ? "bg-emerald-500"
-                                            : "bg-red-500"
-                                        : "bg-amber-500"
-                                        }`}></span>
-                                    {submissionResult.isValidated
-                                        ? submissionResult.outputMatches
-                                            ? "✓ Output Valid!"
-                                            : "✗ Output Invalid"
-                                        : "Submission Complete"}
-                                </span>
-                                <button
-                                    onClick={() => setShowSubmissionModal(false)}
-                                    className="text-zinc-400 hover:text-white hover:bg-zinc-800 p-1.5 rounded-lg transition duration-200"
-                                >
-                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            {/* Modal Content */}
-                            <div className="p-6 space-y-6">
-                                {/* Validation Status */}
-                                {submissionResult.isValidated && (
-                                    <div className={`rounded-xl p-5 border ${submissionResult.outputMatches
-                                        ? "bg-emerald-950/30 border-emerald-900/50"
-                                        : "bg-red-950/30 border-red-900/50"
-                                        }`}>
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <span className={`text-2xl font-bold ${submissionResult.outputMatches ? "text-emerald-400" : "text-red-400"
-                                                }`}>
-                                                {submissionResult.outputMatches ? "✓" : "✗"}
-                                            </span>
-                                            <div>
-                                                <h3 className={`font-bold text-sm ${submissionResult.outputMatches ? "text-emerald-400" : "text-red-400"
-                                                    }`}>
-                                                    {submissionResult.outputMatches
-                                                        ? "Output Matches Expected!"
-                                                        : "Output Does Not Match Expected"}
-                                                </h3>
-                                                <p className="text-xs text-zinc-400 mt-0.5">
-                                                    {submissionResult.outputMatches
-                                                        ? "Your code produces the correct output."
-                                                        : "Your code output differs from the expected output."}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Expected Output */}
-                                <div className="space-y-2">
-                                    <span className="text-xs uppercase font-bold text-blue-400 tracking-wider block">Expected Output</span>
-                                    <pre className="text-xs font-mono bg-zinc-950 text-blue-300 p-4 rounded-xl border border-blue-900/30 overflow-x-auto whitespace-pre-wrap max-h-40 scrollbar-thin">
-                                        {submissionResult.expectedOutput || "No expected output"}
-                                    </pre>
-                                </div>
-
-                                {/* Your Output */}
-                                <div className="space-y-2">
-                                    <span className="text-xs uppercase font-bold text-emerald-400 tracking-wider block">Your Output</span>
-                                    <pre className="text-xs font-mono bg-zinc-950 text-emerald-300 p-4 rounded-xl border border-emerald-900/30 overflow-x-auto whitespace-pre-wrap max-h-40 scrollbar-thin">
-                                        {submissionResult.output || "No output generated"}
-                                    </pre>
-                                </div>
-
-                                {/* Modal Actions */}
-                                <div className="flex gap-3 pt-4 border-t border-zinc-800">
-                                    <button
-                                        onClick={handleDownloadPDF}
-                                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition duration-200 font-bold text-sm flex items-center justify-center gap-2"
-                                    >
-                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                        </svg>
-                                        Download PDF
-                                    </button>
-                                    <button
-                                        onClick={() => setShowSubmissionModal(false)}
-                                        className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-2 rounded-lg transition duration-200 font-bold text-sm"
-                                    >
-                                        Close
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     )

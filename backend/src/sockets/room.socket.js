@@ -60,6 +60,21 @@ const registerRoomHandlers = (io, socket) => {
     socket.in(roomId).emit("code-idle");
   });
 
+  socket.on(ACTIONS.LEAVE, ({ roomId }) => {
+    socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
+      socketId: socket.id,
+      username: userSocketMap[socket.id],
+    });
+    socket.leave(roomId);
+  });
+
+  socket.on(ACTIONS.ASSIGNMENT_COMPLETED, ({ roomId, assignmentId }) => {
+    socket.in(roomId).emit(ACTIONS.ASSIGNMENT_COMPLETED, {
+      roomId,
+      assignmentId,
+    });
+  });
+
   // WEBRTC SIGNALING - OFFER
   socket.on("webrtc-offer", ({ roomId, offer, targetSocketId }) => {
     io.to(targetSocketId).emit("webrtc-offer", {

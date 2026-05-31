@@ -44,6 +44,44 @@ const submissionSchema = mongoose.Schema(
     marks: {
       type: String,
     },
+    aiEvaluation: {
+      status: {
+        type: String,
+        enum: ["pending", "completed", "failed"],
+        default: "pending",
+      },
+      category: {
+        type: String,
+        enum: ["hardcoded", "partial", "correct"],
+      },
+      score: Number,
+      feedback: String,
+      weaknesses: [String],
+      mcqs: [
+        {
+          question: String,
+          options: [String],
+          answer: String,
+        },
+      ],
+    },
+    assessment: {
+      completed: {
+        type: Boolean,
+        default: false,
+      },
+      score: {
+        type: Number,
+        default: 0,
+      },
+      answers: [
+        {
+          questionIndex: Number,
+          selectedOption: String,
+          isCorrect: Boolean,
+        },
+      ],
+    },
   },
   {
     timestamps: true,

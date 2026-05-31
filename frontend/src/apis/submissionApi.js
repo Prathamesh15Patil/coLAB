@@ -1,6 +1,11 @@
 import { request } from "./apiClient";
 
-export const submitAssignment = async (assignmentId, code, output, studentsInRoom = []) => {
+export const submitAssignment = async (
+  assignmentId,
+  code,
+  output,
+  studentsInRoom = [],
+) => {
   try {
     const response = await request("/api/submission/submit", {
       method: "POST",
@@ -17,6 +22,21 @@ export const submitAssignment = async (assignmentId, code, output, studentsInRoo
   }
 };
 
+export const submitSubmissionAssessment = async (submissionId, answers) => {
+  try {
+    const response = await request(
+      `/api/submission/${submissionId}/assessment`,
+      {
+        method: "POST",
+        body: JSON.stringify({ answers }),
+      },
+    );
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const downloadSubmissionPDF = async (submissionId) => {
   try {
     const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -27,7 +47,7 @@ export const downloadSubmissionPDF = async (submissionId) => {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -51,9 +71,12 @@ export const downloadSubmissionPDF = async (submissionId) => {
 
 export const getSubmissionsByAssignment = async (assignmentId) => {
   try {
-    const response = await request(`/api/submission/assignment/${assignmentId}`, {
-      method: "GET",
-    });
+    const response = await request(
+      `/api/submission/assignment/${assignmentId}`,
+      {
+        method: "GET",
+      },
+    );
     return response;
   } catch (error) {
     throw error;

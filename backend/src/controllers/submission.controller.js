@@ -5,6 +5,7 @@ import User from "../models/user.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { generateSubmissionPDF } from "../utils/generatePDF.js";
+import geminiEvaluator from "../services/geminiEvaluator.service.js";
 import fs from "fs";
 
 // Utility to normalize output for comparison (remove trailing whitespace)
@@ -90,6 +91,29 @@ const submitAssignment = asyncHandler(async (req, res) => {
     },
   });
 
+  try {
+    const evaluation = await geminiEvaluator({
+      title: assignment.title,
+      description: assignment.description,
+      sampleInput: assignment.sampleInput,
+      sampleOutput: assignment.sampleOutput,
+      code: submission.code,
+      language: assignment.language,
+    });
+
+    submission.aiEvaluation = {
+      status: "completed",
+      ...evaluation,
+    };
+  } catch (error) {
+    console.error("Gemini evaluation failed:", error);
+    submission.aiEvaluation = {
+      status: "failed",
+    };
+  }
+
+  await submission.save();
+
   res.status(201).json({
     message: "Assignment submitted successfully",
     submission: {
@@ -97,6 +121,7 @@ const submitAssignment = asyncHandler(async (req, res) => {
       assignmentId: submission.assignmentId,
       outputMatches: submission.outputMatches,
       isValidated: submission.isValidated,
+      aiEvaluation: submission.aiEvaluation,
       createdAt: submission.createdAt,
     },
   });
@@ -145,12 +170,16 @@ const getSubmissionPDF = asyncHandler(async (req, res) => {
     const pdfData = {
       classCode: assignment.classId.classId,
       assignmentTitle: assignment.title,
+      assignmentDescription: assignment.description,
+      sampleInput: assignment.sampleInput,
+      sampleOutput: assignment.sampleOutput,
+      maximumMarks: 10,
       submittedBy: studentsInRoom.join(", "),
       studentsInRoom,
+      submissionDate: submission.createdAt,
       code: submission.code,
-      output: submission.output,
-      expectedOutput: submission.expectedOutput,
-      outputMatches: submission.outputMatches,
+      aiEvaluation: submission.aiEvaluation,
+      assessment: submission.assessment,
     };
 
     // Generate PDF
@@ -204,4 +233,80 @@ const getSubmissionsByAssignment = asyncHandler(async (req, res) => {
   });
 });
 
-export { submitAssignment, getSubmissionPDF, getSubmissionsByAssignment };
+const submitSubmissionAssessment = asyncHandler(async (req, res) => {
+  const { submissionId } = req.params;
+  const { answers } = req.body;
+
+  if (!submissionId?.trim()) {
+    throw new ApiError(400, "Submission ID is required");
+  }
+
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) {
+    throw new ApiError(400, "Answers must be provided as an object");
+  }
+
+  const submission = await Submission.findById(submissionId).populate(
+    "submittedBy",
+    "_id",
+  );
+
+  if (!submission) {
+    throw new ApiError(404, "Submission not found");
+  }
+
+  const isTeamMember = submission.submittedBy.some(
+    (member) => member._id.toString() === req.user._id.toString(),
+  );
+
+  if (!isTeamMember) {
+    throw new ApiError(
+      403,
+      "Unauthorized to submit assessment for this submission",
+    );
+  }
+
+  const mcqs = submission.aiEvaluation?.mcqs || [];
+  if (!mcqs.length) {
+    throw new ApiError(400, "No MCQs available for this submission");
+  }
+
+  const submittedAnswers = Object.keys(answers);
+  if (submittedAnswers.length !== mcqs.length) {
+    throw new ApiError(400, "Please answer all questions");
+  }
+
+  const assessmentAnswers = mcqs.map((mcq, index) => {
+    const selectedOption = answers[String(index)];
+    const isCorrect = selectedOption === mcq.answer;
+    return {
+      questionIndex: index,
+      selectedOption: selectedOption || "",
+      isCorrect,
+    };
+  });
+
+  const score = assessmentAnswers.reduce(
+    (total, answer) => total + (answer.isCorrect ? 1 : 0),
+    0,
+  );
+
+  submission.assessment = {
+    completed: true,
+    score,
+    answers: assessmentAnswers,
+  };
+
+  await submission.save();
+
+  res.status(200).json({
+    message: "Assessment submitted successfully",
+    submission,
+  });
+});
+
+export {
+  submitAssignment,
+  getSubmissionPDF,
+  getSubmissionsByAssignment,
+  submitSubmissionAssessment,
+};
