@@ -19,14 +19,14 @@ const tokenOptions = {
 
 //Auth Controllers
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, role, password } = req.body;
+  const { name, email, password } = req.body;
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     throw new ApiError(409, "User already exist, plz login instead");
   }
 
-  if ([name, email, role, password].some((field) => !field?.trim())) {
+  if ([name, email, password].some((field) => !field?.trim())) {
     throw new ApiError(400, "All fields are required");
   }
 
@@ -36,7 +36,6 @@ const registerUser = asyncHandler(async (req, res) => {
     name,
     email,
     password: hashedPassword,
-    role,
   });
 
   const token = jwt.sign(

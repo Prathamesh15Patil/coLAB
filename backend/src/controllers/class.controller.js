@@ -5,9 +5,6 @@ import { ApiError } from "../utils/ApiError.js";
 
 const create = asyncHandler(async (req, res) => {
   const { name, courseCode, division } = req.body;
-  if (req.user.role !== "faculty") {
-    throw new ApiError(403, "Unauthorized");
-  }
 
   if (
     ![name, courseCode, division].every(
@@ -162,10 +159,6 @@ const UpdateClass = asyncHandler(async (req, res) => {
   const { classId } = req.params;
   const { name } = req.body;
 
-  if (req.user.role !== "faculty") {
-    throw new ApiError(403, "Unauthorized");
-  }
-
   if (!name?.trim()) {
     throw new ApiError(400, "Name is required to update class");
   }
@@ -202,10 +195,7 @@ const DeleteClass = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Class not found");
   }
 
-  if (
-    req.user.role !== "faculty" ||
-    classDoc.facultyId.toString() !== req.user._id.toString()
-  ) {
+  if (classDoc.facultyId.toString() !== req.user._id.toString()) {
     throw new ApiError(403, "Unauthorized action");
   }
 

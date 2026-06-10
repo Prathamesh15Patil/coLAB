@@ -6,7 +6,6 @@ const Signin = ({ setUser }) => {
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
-    const [role, setRole] = useState('student')
     const [error, setError] = useState('')
     const navigate = useNavigate()
 
@@ -15,7 +14,7 @@ const Signin = ({ setUser }) => {
         setError('')
 
         try {
-            const data = await registerUser({ name, email, password, role })
+            const data = await registerUser({ name, email, password })
             setUser(data.user)
             const nextPath = data.user.role === 'faculty' ? '/classes' : '/enrolled'
             navigate(nextPath)
@@ -59,17 +58,6 @@ const Signin = ({ setUser }) => {
                             className="mt-1 w-full rounded border px-3 py-2"
                             required
                         />
-                    </label>
-                    <label className="block">
-                        <span className="text-sm font-medium">Role</span>
-                        <select
-                            value={role}
-                            onChange={(event) => setRole(event.target.value)}
-                            className="mt-1 w-full rounded border px-3 py-2"
-                        >
-                            <option value="student">Student</option>
-                            <option value="faculty">Faculty</option>
-                        </select>
                     </label>
                     <button className="w-full rounded bg-slate-900 px-4 py-2 text-white" type="submit">
                         Register
