@@ -42,7 +42,7 @@ const registerRoomHandlers = (io, socket) => {
 
   //LANGUAGE CHANGE
   socket.on("language-change", ({ roomId, language }) => {
-    socket.in(roomId).emit("language-change", { language });
+    io.in(roomId).emit("language-change", { language });
   });
 
   //LANGUAGE SYNC FOR NEW_JOINERS

@@ -12,7 +12,8 @@ import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 
-const rootTempDir = path.resolve(process.cwd(), "exe-temp");
+const rootTempDir =
+  process.env.EXECUTION_TEMP_DIR || path.resolve(process.cwd(), "exe-temp");
 
 const createTempDir = async () => {
   try {

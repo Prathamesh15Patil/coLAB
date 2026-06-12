@@ -1,3 +1,7 @@
-FROM python:3.11
+FROM python:3.11-slim
 
-RUN pip install numpy pandas matplotlib scikit-learn
+RUN pip install --no-cache-dir \
+    numpy \
+    pandas \
+    matplotlib \
+    scikit-learn
