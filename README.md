@@ -139,6 +139,12 @@ MONGODB_URI=your_mongodb_connection_string
    npm start
    ```
 
+> Note: Creating and managing classes or assignments requires a faculty account.
+> Use the following faculty credentials to log in and try assignment creation for your own class:
+>
+> - Email: `faculty1@email.com`
+> - Password: `12345`
+
 ## Current Limitations
 
 As an MVP focused on educational collaboration, the current architecture has several known limitations:
