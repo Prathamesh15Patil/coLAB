@@ -27,13 +27,23 @@ const executeCode = async (code, language, input = "") => {
     // const files = await fs.promises.readdir(executionDir);
     // console.log("Files Written:", files);
 
-    const hostExecutionDir = executionDir
+    let hostExecutionDir = executionDir
       .replace(
         process.env.EXECUTION_TEMP_DIR,
         process.env.HOST_EXECUTION_TEMP_DIR,
-      )
-      .replaceAll("/", "\\");
-    console.log("Host Execution Dir:", hostExecutionDir);
+      );
+
+    if(process.platform === "win32"){
+	hostExecutionDir = hostExecutionDir.replaceAll("/","\\");
+    }
+    
+
+console.log("Execution Dir:", executionDir);
+console.log("Host Execution Dir:", hostExecutionDir);
+console.log(
+  "Docker Mount:",
+  `${hostExecutionDir}:/workspace`
+);
 
     const args = [
       "run",

@@ -39,7 +39,7 @@ export const submitSubmissionAssessment = async (submissionId, answers) => {
 
 export const downloadSubmissionPDF = async (submissionId) => {
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+    const API_BASE = import.meta.env.VITE_API_URL;
     const response = await fetch(
       `${API_BASE}/api/submission/${submissionId}/pdf`,
       {
